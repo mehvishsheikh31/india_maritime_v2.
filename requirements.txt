@@ -1,0 +1,6 @@
+pandas
+streamlit
+pydeck
+plotly
+pyarrow
+fastparquet

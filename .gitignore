@@ -1,0 +1,10 @@
+data/
+venv/
+__pycache__/
+.env
+*.csv
+*.parquet"data/" 
+"venv/" 
+"__pycache__/" 
+"*.csv" 
+"*.parquet" 
