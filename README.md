@@ -1,71 +1,120 @@
 
 
-# ⚓ Indian Ocean Strategic Command: Maritime Domain Awareness (v2.0)
+# ⚓ Indian Ocean Maritime Analytics Dashboard (v2.0)
 
-## 📖 Executive Summary
+## 🌍 Overview
 
-The **Indian Ocean Strategic Command** is a high-performance geospatial intelligence platform engineered to monitor, analyze, and visualize industrial fishing activities across the Indian Ocean Region (IOR). Utilizing the **Global Fishing Watch (GFW) v3.0 Public Data Release (March 2025)**, this system transforms over **1.35 Million telemetry pings** into actionable maritime intelligence.
+This project is a geospatial analytics dashboard that monitors industrial fishing activity in the Indian Ocean Region (IOR) using Global Fishing Watch (GFW) public AIS data.
 
-The project identifies fleet concentrations, detects behavioral anomalies, and provides a comprehensive breakdown of the 4,000+ unique vessels operating within India's strategic maritime zone
-
----
-
-## 🖥️ Command Interface & Tactical UI
-
-The system features a **"Blackout" Tactical Terminal**—a high-contrast, jet-black interface designed for maximum data visibility and professional command-center aesthetics.
-
-### Key Visual Intelligence Features:
-
-* **3D Spatial Projection:** Utilizes **ColumnLayer (3D Pillars)** to visualize fishing intensity. The elevation of each white pillar represents the cumulative fishing hours in a specific coordinate, allowing for immediate identification of regional "hotspots."
-* **Temporal Trend Analysis:** Interactive line charts track monthly activity shifts throughout 2024, identifying seasonal patterns and peak fishing efforts.
-* **Fleet Composition Donut:** A categorical breakdown of the fleet by vessel gear type (e.g., Trawlers, Longliners, Seiners).
-* **Suspicious Activity Leaderboard:** A data-driven registry that automatically flags vessels exhibiting extreme station-keeping (18–24 hours of continuous activity).
+It processes large-scale vessel telemetry data and transforms raw satellite pings into interactive visual intelligence — helping identify fishing hotspots, vessel activity trends, and suspicious long-duration behavior.
 
 ---
 
-## 🛠️ Tech Stack & Engineering
+## 🎯 Problem Statement
 
-The project is built on a modular, high-performance data pipeline designed to handle "Big Data" scales on a standard machine.
+Monitoring maritime activity requires:
 
-* **Core Engine:** **Python 3.10+**
-* **Data Engineering:** **Pandas** (Chunk-based processing for 3.4GB+ raw telemetry).
-* **Storage Architecture:** **Apache Parquet** (Vectorized storage format used to accelerate dashboard performance by 10x and reduce storage footprint by 70%).
-* **Geospatial Rendering:** **PyDeck (Deck.gl)** (GPU-accelerated 3D rendering of 1.3M+ geospatial points).
-* **Statistical Analysis:** **Plotly** (Dynamic temporal and categorical charts).
-* **Intelligence Interface:** **Streamlit** (Custom CSS-injected "Command" theme).
+* Processing millions of AIS telemetry records
+* Identifying vessel concentrations in specific regions
+* Detecting unusual long-duration fishing behavior
+* Presenting insights in an interactive and interpretable format
 
----
-
-## 🧠 Strategic Insights Generated
-
-Through the analysis of the 2024–2025 IOR dataset, the system generates the following intelligence:
-
-### 1. Fleet Volume & Identity
-
-The system successfully tracked and identified **4,084 unique vessels**. By merging raw MMSI pings with the GFW Vessel Registry, the system provides "Human Intelligence" (Ship Names and Flag States) for previously anonymous telemetry.
-
-### 2. Anomaly Detection
-
-The platform uses a threshold-based detection algorithm to identify **high-intensity anomalies**. Vessels exceeding 20 hours of fishing in a single location are flagged for "Station-keeping," a common indicator of illegal encroachment or over-exploitation of maritime resources.
-
-### 3. Regional Hotspots
-
-Tactical mapping reveals high-density concentrations near **Lakshadweep** and the **Bay of Bengal**, providing a data-driven baseline for maritime patrolling and resource management.
-
-### 4. Flag State Distribution
-
-The dashboard provides a breakdown of foreign vs. domestic fishing efforts, offering a geopolitical view of which nations are most active within the IOR strategic zone.
+Raw AIS data alone is difficult to analyze without structured processing and visualization.
 
 ---
 
-## 📁 Project Architecture
+## ⚙️ Solution Approach
 
-* **`/src`**: Contains the data ingestion engine and the relational merger logic.
-* **`/data`**: Structured repository for raw AIS telemetry and the final processed Intelligence Parquet.
-* **`app.py`**: The primary Tactical Command interface.
+The system consists of three main components:
 
+### 1️⃣ Data Processing Pipeline
 
-
-**Specialization:** Big Data Analytics & Strategic Geospatial Intelligence
+* Processed large CSV telemetry files using **Pandas chunk-based loading**
+* Filtered India-region coordinates (5–25°N, 65–95°E)
+* Standardized MMSI, timestamp, and location fields
+* Stored optimized datasets using **Apache Parquet** format
 
 ---
+
+### 2️⃣ Identity Enrichment
+
+* Merged AIS activity data with vessel registry dataset
+* Linked MMSI to:
+
+  * Vessel Name
+  * Flag State
+  * Vessel Type
+* Handled missing identity values safely
+
+---
+
+### 3️⃣ Interactive Intelligence Dashboard
+
+Built using **Streamlit + PyDeck + Plotly**:
+
+* 3D geospatial column visualization of fishing intensity
+* Monthly fishing-hour trend analysis
+* Fleet composition breakdown
+* Top vessel activity leaderboard
+* Rule-based anomaly detection (fishing hours threshold > 20 hrs)
+* Downloadable filtered reports
+
+---
+
+## 🧠 Key Insights Generated
+
+* Tracked 4,000+ unique vessels
+* Processed 1.3M+ telemetry pings
+* Identified regional fishing hotspots
+* Flagged vessels exhibiting prolonged station-keeping behavior
+
+Anomaly detection is implemented using rule-based fishing-hour thresholds.
+
+---
+
+## 🛠️ Tech Stack
+
+**Backend & Processing:**
+Python, Pandas (chunk processing), Apache Parquet
+
+**Visualization & Interface:**
+Streamlit, PyDeck (Deck.gl ColumnLayer), Plotly Express
+
+**Data Source:**
+Global Fishing Watch (GFW) Public Data Release
+
+---
+
+## 📁 Project Structure
+
+```
+/src                  → Data ingestion & merge logic
+/data/raw             → Raw AIS & vessel registry files
+/data/processed       → Optimized Parquet dataset
+app.py                → Streamlit dashboard
+```
+
+---
+
+## 🚀 Performance Optimizations
+
+* Chunk-based CSV loading to handle large files efficiently
+* Parquet storage for faster dashboard loading
+* Cached data loading using Streamlit
+
+---
+
+## 📌 Scope & Limitations
+
+* Rule-based anomaly detection (no ML models used)
+* Region restricted to Indian Ocean coordinates
+* Designed for analytics and visualization purposes
+
+---
+
+## 👩‍💻 Author
+
+Mehvish Sheikh
+B.Tech – Data Science
+
+-
