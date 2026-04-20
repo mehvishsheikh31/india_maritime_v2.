@@ -68,12 +68,6 @@ h1, h2, h3, h4, p, span, label, div {
     border-radius: 8px !important;
 }
 .dvn-scroller { background: #0d1420 !important; }
-.dvn-scroller * { color: #e8f0fe !important; }
-[data-testid="stDataFrame"] * { color: #e8f0fe !important; }
-[data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
-    color: #e8f0fe !important;
-    background-color: #0d1420 !important;
-}
 
 /* ── Buttons ── */
 .stDownloadButton > button, .stButton > button {
@@ -128,24 +122,6 @@ hr { border-color: rgba(0,200,160,0.1) !important; }
 
 /* ── Progress bar ── */
 .stProgress > div > div { background-color: #00c8a0 !important; }
-
-/* Dropdown options panel */
-[data-baseweb="popover"] * { 
-    background-color: #111a28 !important; 
-    color: #e8f0fe !important; 
-}
-[data-baseweb="menu"] * { 
-    background-color: #111a28 !important; 
-    color: #e8f0fe !important; 
-}
-[data-baseweb="option"]:hover {
-    background-color: rgba(0,200,160,0.15) !important;
-}
-/* Selected tag text inside multiselect */
-[data-baseweb="tag"] span { color: #00c8a0 !important; }
-/* Selectbox current value text */
-[data-baseweb="select"] [data-testid="stMarkdownContainer"] p,
-[data-baseweb="select"] span { color: #e8f0fe !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -361,167 +337,336 @@ def main():
         import time; time.sleep(0.4)
         progress.empty()
 
-    # ── Sidebar & Filters ──
-    hr_filter, sel_flags, sel_types, sev_filter, map_color = build_sidebar(df)
-    fdf = apply_filters(df, hr_filter, sel_flags, sel_types, sev_filter)
+    # ── Tabs ──
+    tab_dashboard, tab_about = st.tabs(["📡  Dashboard", "📖  How It Works"])
 
-    if len(fdf) == 0:
-        st.warning("No vessels match the current filters. Adjust filters in the sidebar.")
-        return
+    # ════════════════════════════════════════════════════════════
+    # TAB 1 — DASHBOARD
+    # ════════════════════════════════════════════════════════════
+    with tab_dashboard:
 
-    # ── KPI Strip ──
-    anomaly_count = len(fdf[fdf["fishing_hours"] > 20])
-    unique_vessels = fdf["MMSI"].nunique()
-    total_pings = len(fdf)
-    top_flag = fdf["Flag"].value_counts().idxmax() if len(fdf) > 0 else "—"
+        # ── Sidebar & Filters ──
+        hr_filter, sel_flags, sel_types, sev_filter, map_color = build_sidebar(df)
+        fdf = apply_filters(df, hr_filter, sel_flags, sel_types, sev_filter)
 
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total Targets", f"{unique_vessels:,}", delta=f"Filter: ≥{hr_filter}h")
-    k2.metric("Telemetry Pings", f"{total_pings:,}")
-    k3.metric("Dominant Flag", top_flag)
+        if len(fdf) == 0:
+            st.warning("No vessels match the current filters. Adjust filters in the sidebar.")
+            return
 
-    # Anomaly metric with orange accent (via container hack)
-    with k4:
-        st.markdown(
-            f"""
-            <div style="background:#0d1420; border:1px solid rgba(0,200,160,0.15);
-                        border-top:2px solid #ff6b35; border-radius:8px; padding:16px;">
-                <div style="font-family:'Space Mono',monospace; font-size:10px;
-                             letter-spacing:2px; color:#6b8099; text-transform:uppercase;">
-                    Anomalies (&gt;20h)
+        # ── KPI Strip ──
+        anomaly_count = len(fdf[fdf["fishing_hours"] > 20])
+        unique_vessels = fdf["MMSI"].nunique()
+        total_pings = len(fdf)
+        top_flag = fdf["Flag"].value_counts().idxmax() if len(fdf) > 0 else "—"
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Total Ships Tracked", f"{unique_vessels:,}", delta=f"Filter: ≥{hr_filter}h")
+        k2.metric("Satellite Signals Recorded", f"{total_pings:,}")
+        k3.metric("Most Active Country", top_flag)
+
+        with k4:
+            st.markdown(
+                f"""
+                <div style="background:#0d1420; border:1px solid rgba(0,200,160,0.15);
+                            border-top:2px solid #ff6b35; border-radius:8px; padding:16px;">
+                    <div style="font-family:'Space Mono',monospace; font-size:10px;
+                                 letter-spacing:2px; color:#6b8099; text-transform:uppercase;">
+                        Suspicious Ships (&gt;20h)
+                    </div>
+                    <div style="font-family:'Space Mono',monospace; font-size:28px;
+                                 font-weight:700; color:#ff6b35; margin-top:4px;">
+                        {anomaly_count:,}
+                    </div>
                 </div>
-                <div style="font-family:'Space Mono',monospace; font-size:28px;
-                             font-weight:700; color:#ff6b35; margin-top:4px;">
-                    {anomaly_count:,}
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── Row 1: Map + Flag Chart ──
+        col_map, col_flags = st.columns([3, 2])
+
+        with col_map:
+            st.markdown('<span class="section-label">◈ Where Are The Ships? (Indian Ocean Map)</span>', unsafe_allow_html=True)
+            st.caption("Each spike on the map = a fishing hotspot. Taller spike = more fishing hours recorded at that location.")
+            view = pdk.ViewState(latitude=14.0, longitude=79.0, zoom=4.5, pitch=45, bearing=0)
+            fill = get_map_color(map_color)
+            layer = pdk.Layer(
+                "ColumnLayer",
+                fdf[["LON", "LAT", "fishing_hours"]].dropna(),
+                get_position="[LON, LAT]",
+                get_elevation="fishing_hours",
+                elevation_scale=5000,
+                radius=4500,
+                get_fill_color=fill,
+                pickable=True,
+                auto_highlight=True,
+            )
+            deck = pdk.Deck(
+                map_style="mapbox://styles/mapbox/dark-v11",
+                initial_view_state=view,
+                layers=[layer],
+                tooltip={"text": "📍 Location: {LAT}°N, {LON}°E\n🎣 Total fishing time: {fishing_hours} hours"},
+            )
+            st.pydeck_chart(deck)
+
+        with col_flags:
+            st.markdown('<span class="section-label">▶ Which Countries Are Fishing Here?</span>', unsafe_allow_html=True)
+            st.caption("Country codes: LKA = Sri Lanka · IND = India · CHN = China · PAK = Pakistan")
+            st.plotly_chart(make_flag_chart(fdf), width='stretch')
+
+        # ── Row 2: Trends + Gear + Hourly ──
+        st.markdown("---")
+        c1, c2, c3 = st.columns([2, 1.2, 1.2])
+
+        with c1:
+            st.markdown('<span class="section-label">↗ Fishing Activity by Month</span>', unsafe_allow_html=True)
+            st.caption("Total fishing hours recorded each month across the Indian Ocean Region.")
+            st.plotly_chart(make_trend_chart(fdf), width='stretch')
+
+        with c2:
+            st.markdown('<span class="section-label">◎ Types of Fishing Vessels</span>', unsafe_allow_html=True)
+            st.caption("Trawlers drag nets along the sea floor. Longliners use lines with hundreds of hooks.")
+            st.plotly_chart(make_gear_chart(fdf), width='stretch')
+
+        with c3:
+            st.markdown('<span class="section-label">⏱ What Time of Day Do They Fish?</span>', unsafe_allow_html=True)
+            st.caption("Average fishing hours per UTC hour of day. Shows if fishing peaks at night or daytime.")
+            st.plotly_chart(make_hourly_chart(fdf), width='stretch')
+
+        # ── Row 3: Anomaly Scatter + Top Targets ──
+        st.markdown("---")
+        col_scatter, col_targets = st.columns([3, 2])
+
+        with col_scatter:
+            st.markdown('<span class="section-label">⚠ Suspicious Ships — Plotted by Location</span>', unsafe_allow_html=True)
+            st.caption("🔴 Critical = fishing 20+ hrs non-stop · 🟠 High = 15–20 hrs · 🔵 Medium = 10–15 hrs. Larger dot = more hours.")
+            st.plotly_chart(make_anomaly_scatter(fdf), width='stretch')
+
+        with col_targets:
+            st.markdown('<span class="section-label">🕵 Most Active Ships</span>', unsafe_allow_html=True)
+            st.caption("Ships with the highest total fishing hours. Bar length shows relative activity.")
+            suspects = (
+                fdf.groupby(["VesselName", "Flag", "VesselType"])["fishing_hours"]
+                .sum().reset_index().nlargest(10, "fishing_hours")
+                .rename(columns={"VesselName": "Ship Name", "Flag": "Country",
+                                  "VesselType": "Vessel Type", "fishing_hours": "Total Hrs"})
+            )
+            suspects["Total Hrs"] = suspects["Total Hrs"].round(1)
+            suspects["Alert Level"] = suspects["Total Hrs"].apply(
+                lambda h: "🔴 Critical" if h > 20 else ("🟠 High" if h > 15 else "🟡 Medium")
+            )
+            st.dataframe(
+                suspects.reset_index(drop=True),
+                width='stretch',
+                column_config={
+                    "Total Hrs": st.column_config.ProgressColumn(
+                        "Total Hrs", min_value=0,
+                        max_value=float(suspects["Total Hrs"].max()),
+                        format="%.1f",
+                    ),
+                },
+                hide_index=True,
+            )
+
+        # ── Row 4: Insight + Download ──
+        st.markdown("---")
+        i1, i2 = st.columns([3, 1])
+
+        with i1:
+            st.markdown('<span class="section-label">⚡ Summary</span>', unsafe_allow_html=True)
+            pct_anomaly = anomaly_count / unique_vessels * 100 if unique_vessels > 0 else 0
+            top5_flags = fdf["Flag"].value_counts().head(3).index.tolist()
+            lka_pct = (fdf["Flag"] == top_flag).sum() / len(fdf) * 100
+            st.info(
+                f"**{anomaly_count:,} ships** ({pct_anomaly:.1f}% of all tracked vessels) were fishing for more than 20 hours "
+                f"continuously — a possible sign of illegal or unreported fishing. "
+                f"Ships from **{top_flag}** were the most active, making up {lka_pct:.1f}% of all satellite signals. "
+                f"Top 3 countries by activity: {', '.join(top5_flags)}."
+            )
+
+        with i2:
+            st.markdown('<span class="section-label">📥 Download Report</span>', unsafe_allow_html=True)
+            csv = fdf[["MMSI", "VesselName", "Flag", "VesselType", "fishing_hours", "Severity"]].to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "⬇ DOWNLOAD AS CSV",
+                data=csv,
+                file_name="IOR_Report.csv",
+                mime="text/csv",
+            )
+
+        # ── Full Registry ──
+        st.markdown("---")
+        with st.expander("📋  Full Ship Registry — Click to Expand", expanded=False):
+            st.caption("Complete list of all tracked vessels, sorted by fishing hours. Bar shows activity level relative to the most active ship.")
+            display_cols = ["MMSI", "VesselName", "Flag", "VesselType", "fishing_hours", "Severity", "Month"]
+            display_cols = [c for c in display_cols if c in fdf.columns]
+            rename_map = {"MMSI": "Ship ID", "VesselName": "Ship Name", "Flag": "Country",
+                          "VesselType": "Vessel Type", "fishing_hours": "Fishing Hours",
+                          "Severity": "Alert Level", "Month": "Month"}
+            show_df = fdf[display_cols].sort_values("fishing_hours", ascending=False).head(200).reset_index(drop=True)
+            show_df = show_df.rename(columns=rename_map)
+            st.dataframe(
+                show_df,
+                width='stretch',
+                column_config={
+                    "Fishing Hours": st.column_config.ProgressColumn(
+                        "Fishing Hours", min_value=0,
+                        max_value=float(show_df["Fishing Hours"].max()),
+                        format="%.1f",
+                    ),
+                },
+                hide_index=True,
+            )
+
+    # ════════════════════════════════════════════════════════════
+    # TAB 2 — HOW IT WORKS
+    # ════════════════════════════════════════════════════════════
+    with tab_about:
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Hero
+        st.markdown("""
+        <div style="background:#0d1420; border:1px solid rgba(0,200,160,0.2); border-radius:12px;
+                    padding:28px 32px; margin-bottom:28px;">
+            <div style="font-family:'Space Mono',monospace; font-size:20px; font-weight:700;
+                        color:#00c8a0; margin-bottom:10px;">
+                ⚓ What is this dashboard?
+            </div>
+            <p style="font-size:15px; line-height:1.8; color:#9ab0c8 !important;">
+                This is a <strong style="color:#e8f0fe;">maritime surveillance dashboard</strong> that tracks
+                fishing vessels in the <strong style="color:#e8f0fe;">Indian Ocean</strong> using real
+                satellite data. It processes over <strong style="color:#e8f0fe;">1.3 million location signals</strong>
+                from ships and turns them into visual maps and charts — helping identify
+                <strong style="color:#e8f0fe;">where fishing is happening, who is doing it, and whether any ships
+                are behaving suspiciously.</strong>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Glossary
+        st.markdown('<span class="section-label">📚 What Do These Words Mean?</span>', unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        terms = [
+            ("🛰️ AIS (Automatic Identification System)",
+             "A tracking system every large ship is legally required to carry. It broadcasts the ship's location, speed, and identity every few seconds via satellite — like a GPS tracker that's always on. This dashboard uses those signals to know where every ship is."),
+            ("📡 Telemetry Ping / Satellite Signal",
+             "One single location broadcast from a ship. Think of it like one dot on a map saying 'I am here, right now.' This dataset has 1.3 million such dots, collected from thousands of ships over a full year."),
+            ("🪪 MMSI (Maritime Mobile Service Identity)",
+             "A unique 9-digit ID number assigned to every ship — like an Aadhaar number or a vehicle registration plate, but for boats. Every ship has one. We use it to identify and track individual vessels."),
+            ("🎣 Fishing Hours",
+             "The total number of hours a ship spent actively fishing, calculated from its movement patterns. When a ship moves slowly in a zigzag pattern, the algorithm classifies that as 'fishing behaviour'. This is how we measure how active each vessel is."),
+            ("🚩 Flag State / Country Code",
+             "The country a ship is registered in — not necessarily where the crew is from. LKA = Sri Lanka, IND = India, CHN = China, PAK = Pakistan. A ship 'flying the Sri Lankan flag' means it's registered there."),
+            ("⚓ Vessel Type",
+             "The kind of fishing method the ship uses. Trawlers drag large nets behind them along the ocean floor. Longliners trail lines up to 100 km long with thousands of baited hooks. Different tools, different fish."),
+            ("⚠️ Anomaly / Suspicious Ship",
+             "A ship flagged as suspicious because it fished for more than 20 hours in a single stretch without stopping. Legal fishing operations usually have breaks. Non-stop fishing can indicate IUU fishing — illegal, unreported, or unregulated activity."),
+            ("🌊 IOR (Indian Ocean Region)",
+             "The area of ocean this dashboard covers, defined by coordinates: Latitude 5°N to 25°N and Longitude 65°E to 95°E. This covers the waters around India, Sri Lanka, and nearby countries."),
+            ("🗄️ Parquet File",
+             "A highly efficient file format for storing large amounts of data. The raw data was 3.4 GB of CSV files. After processing and converting to Parquet, it loads 10x faster — which is why the dashboard loads in seconds instead of minutes."),
+            ("🏭 IUU Fishing",
+             "Illegal, Unreported, and Unregulated fishing — a global problem where ships fish in protected areas, beyond their quota, or without reporting their catch. It damages fish populations and the ocean ecosystem. This dashboard is designed to help detect it."),
+        ]
+
+        for title, desc in terms:
+            with st.expander(title):
+                st.markdown(
+                    f'<p style="font-size:14px; line-height:1.8; color:#9ab0c8 !important;">{desc}</p>',
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # How it was built
+        st.markdown('<span class="section-label">🔧 How Was This Built?</span>', unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        steps = [
+            ("Step 1 — Get the Raw Data",
+             "Downloaded the Global Fishing Watch (GFW) 2025 public dataset — 355 daily CSV files containing billions of satellite signals from fishing vessels all over the world. Total size: ~3.4 GB."),
+            ("Step 2 — Filter to the Indian Ocean",
+             "Wrote a Python script to read through all those files in chunks (50,000 rows at a time) without crashing the laptop, and kept only the signals from the Indian Ocean region. This reduced the data to a manageable size."),
+            ("Step 3 — Identify the Ships",
+             "The raw data only had anonymous ship ID numbers (MMSI). Used a vessel registry dataset to match each ID to a real ship name, country flag, and vessel type — like looking up a phone number in a contact book."),
+            ("Step 4 — Detect Suspicious Behaviour",
+             "Applied a rule: any ship with more than 20 hours of continuous fishing was flagged as an anomaly. This is the basis of the anomaly detection — simple but effective for spotting unusual activity."),
+            ("Step 5 — Build the Dashboard",
+             "Built this interactive web dashboard using Streamlit (for the interface), PyDeck (for the 3D map), and Plotly (for the charts). The dark tactical theme was custom-built using CSS."),
+        ]
+
+        for i, (title, desc) in enumerate(steps):
+            st.markdown(
+                f"""
+                <div style="display:flex; gap:16px; margin-bottom:16px; align-items:flex-start;">
+                    <div style="background:rgba(0,200,160,0.1); border:1px solid rgba(0,200,160,0.3);
+                                border-radius:50%; width:36px; height:36px; flex-shrink:0;
+                                display:flex; align-items:center; justify-content:center;
+                                font-family:'Space Mono',monospace; font-size:13px; color:#00c8a0;">
+                        {i+1}
+                    </div>
+                    <div>
+                        <div style="font-weight:600; font-size:14px; color:#e8f0fe; margin-bottom:4px;">{title}</div>
+                        <div style="font-size:13px; color:#9ab0c8; line-height:1.7;">{desc}</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Tech stack
+        st.markdown('<span class="section-label">🛠️ Technologies Used</span>', unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        tech_cols = st.columns(4)
+        techs = [
+            ("Python", "Core programming language used for all data processing and logic."),
+            ("Pandas", "Python library for reading, cleaning, and transforming large datasets."),
+            ("Streamlit", "Framework that turns Python scripts into interactive web apps."),
+            ("PyDeck", "Library for rendering the interactive 3D map with location spikes."),
+            ("Plotly", "Library for creating the interactive charts and graphs."),
+            ("Apache Parquet", "Efficient file format that makes the data load 10x faster."),
+            ("Global Fishing Watch", "The public satellite dataset used as the data source."),
+            ("GitHub", "Used to store and share the code publicly for portfolio purposes."),
+        ]
+        for i, (name, desc) in enumerate(techs):
+            with tech_cols[i % 4]:
+                st.markdown(
+                    f"""
+                    <div style="background:#0d1420; border:1px solid rgba(0,200,160,0.15);
+                                border-radius:8px; padding:14px; margin-bottom:12px; min-height:100px;">
+                        <div style="font-family:'Space Mono',monospace; font-size:12px;
+                                    color:#00c8a0; margin-bottom:6px;">{name}</div>
+                        <div style="font-size:12px; color:#6b8099; line-height:1.6;">{desc}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # About the author
+        st.markdown(
+            """
+            <div style="background:#0d1420; border:1px solid rgba(0,136,255,0.2); border-radius:12px;
+                        padding:24px 28px; margin-top:8px;">
+                <div style="font-family:'Space Mono',monospace; font-size:13px;
+                            color:#0088ff; margin-bottom:10px; letter-spacing:2px;">
+                    👩‍💻 BUILT BY
+                </div>
+                <div style="font-size:16px; font-weight:600; color:#e8f0fe; margin-bottom:6px;">
+                    Mehvish Sheikh
+                </div>
+                <div style="font-size:13px; color:#9ab0c8; line-height:1.8;">
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
-        )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Row 1: Map + Flag Chart ──
-    col_map, col_flags = st.columns([3, 2])
-
-    with col_map:
-        st.markdown('<span class="section-label">◈ Tactical Spatial Projection</span>', unsafe_allow_html=True)
-        view = pdk.ViewState(latitude=14.0, longitude=79.0, zoom=4.5, pitch=45, bearing=0)
-        fill = get_map_color(map_color)
-        layer = pdk.Layer(
-            "ColumnLayer",
-            fdf[["LON", "LAT", "fishing_hours"]].dropna(),
-            get_position="[LON, LAT]",
-            get_elevation="fishing_hours",
-            elevation_scale=5000,
-            radius=4500,
-            get_fill_color=fill,
-            pickable=True,
-            auto_highlight=True,
-        )
-        deck = pdk.Deck(
-            map_style="mapbox://styles/mapbox/dark-v11",
-            initial_view_state=view,
-            layers=[layer],
-            tooltip={"text": "Lat: {LAT}\nLon: {LON}\nFishing hrs: {fishing_hours}"},
-        )
-        st.pydeck_chart(deck)
-
-    with col_flags:
-        st.markdown('<span class="section-label">▶ Operating Flags</span>', unsafe_allow_html=True)
-        st.plotly_chart(make_flag_chart(fdf), width='stretch')
-
-    # ── Row 2: Trends + Gear + Hourly ──
-    st.markdown("---")
-    c1, c2, c3 = st.columns([2, 1.2, 1.2])
-
-    with c1:
-        st.markdown('<span class="section-label">↗ Monthly Activity Trend</span>', unsafe_allow_html=True)
-        st.plotly_chart(make_trend_chart(fdf), width='stretch')
-
-    with c2:
-        st.markdown('<span class="section-label">◎ Fleet Composition</span>', unsafe_allow_html=True)
-        st.plotly_chart(make_gear_chart(fdf), width='stretch')
-
-    with c3:
-        st.markdown('<span class="section-label">⏱ Hourly Activity Pattern</span>', unsafe_allow_html=True)
-        st.plotly_chart(make_hourly_chart(fdf), width='stretch')
-
-    # ── Row 3: Anomaly Scatter + Top Targets ──
-    st.markdown("---")
-    col_scatter, col_targets = st.columns([3, 2])
-
-    with col_scatter:
-        st.markdown('<span class="section-label">⚠ Anomaly Scatter · IOR</span>', unsafe_allow_html=True)
-        st.plotly_chart(make_anomaly_scatter(fdf), width='stretch')
-
-    with col_targets:
-        st.markdown('<span class="section-label">🕵 Top Targets by Fishing Hours</span>', unsafe_allow_html=True)
-        suspects = (
-            fdf.groupby(["VesselName", "Flag", "VesselType"])["fishing_hours"]
-            .sum().reset_index().nlargest(10, "fishing_hours")
-            .rename(columns={"fishing_hours": "Total Hrs"})
-        )
-        suspects["Total Hrs"] = suspects["Total Hrs"].round(1)
-        suspects["Severity"] = suspects["Total Hrs"].apply(
-            lambda h: "🔴 CRITICAL" if h > 20 else ("🟠 HIGH" if h > 15 else "🟡 MEDIUM")
-        )
-        st.dataframe(
-            suspects.reset_index(drop=True),
-            width='stretch',
-            column_config={
-                "Total Hrs": st.column_config.ProgressColumn(
-                    "Total Hrs", min_value=0,
-                    max_value=float(suspects["Total Hrs"].max()),
-                    format="%.1f",
-                ),
-            },
-            hide_index=True,
-        )
-
-    # ── Row 4: Insight + Download ──
-    st.markdown("---")
-    i1, i2 = st.columns([3, 1])
-
-    with i1:
-        st.markdown('<span class="section-label">⚡ Command Insights</span>', unsafe_allow_html=True)
-        pct_anomaly = anomaly_count / unique_vessels * 100 if unique_vessels > 0 else 0
-        top5_flags = fdf["Flag"].value_counts().head(3).index.tolist()
-        lka_pct = (fdf["Flag"] == top_flag).sum() / len(fdf) * 100
-
-        st.info(
-            f"**{anomaly_count:,} vessels** ({pct_anomaly:.1f}%) exceeded the 20h station-keeping threshold — "
-            f"possible IUU fishing indicators. "
-            f"**{top_flag}** dominates with {lka_pct:.1f}% of total pings. "
-            f"Top 3 operating flags: {', '.join(top5_flags)}."
-        )
-
-    with i2:
-        st.markdown('<span class="section-label">📥 Export</span>', unsafe_allow_html=True)
-        csv = fdf[["MMSI", "VesselName", "Flag", "VesselType", "fishing_hours", "Severity"]].to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "⬇ DOWNLOAD TACTICAL REPORT",
-            data=csv,
-            file_name="IOR_Report.csv",
-            mime="text/csv",
-        )
-
-    # ── Full Registry ──
-    st.markdown("---")
-    with st.expander("📋  FULL TARGET REGISTRY", expanded=False):
-        display_cols = ["MMSI", "VesselName", "Flag", "VesselType", "fishing_hours", "Severity", "Month"]
-        display_cols = [c for c in display_cols if c in fdf.columns]
-        st.dataframe(
-            fdf[display_cols].sort_values("fishing_hours", ascending=False).head(200).reset_index(drop=True),
-            width='stretch',
-            column_config={
-                "fishing_hours": st.column_config.ProgressColumn(
-                    "Fishing Hours", min_value=0,
-                    max_value=float(fdf["fishing_hours"].max()),
-                    format="%.1f",
-                ),
-            },
-            hide_index=True,
         )
 
     # ── Footer ──
