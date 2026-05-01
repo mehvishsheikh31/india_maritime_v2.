@@ -32,7 +32,7 @@ LANG = {
         # Header
         "header_title": "⬡ MDA · IOR COMMAND",
         "header_sub": "INDIAN OCEAN REGION · GFW 2025 RELEASE",
-        "live_feed": "● LIVE FEED",
+        "live_feed": "●GFW 2025 DATA",
         "region": "5–25°N / 65–95°E",
 
         # Loading
@@ -169,7 +169,7 @@ LANG = {
         # Header
         "header_title": "⬡ MDA · IOR COMMAND",
         "header_sub": "INDIAN OCEAN REGION · GFW 2025 DATA",
-        "live_feed": "● LIVE DATA",
+        "live_feed": "● GFW 2025 DATA",
         "region": "5–25°N / 65–95°E",
 
         # Loading
@@ -635,7 +635,6 @@ def main():
             </div>
             <div style="display:flex; gap:20px; align-items:center;">
                 <span style="font-family:'Space Mono',monospace; font-size:10px; color:#00c8a0;">
-                    {t("live_feed")}
                 </span>
                 <span style="font-family:'Space Mono',monospace; font-size:10px; color:#6b8099;">
                     {t("region")}
